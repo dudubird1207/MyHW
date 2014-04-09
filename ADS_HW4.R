@@ -24,7 +24,7 @@ text<-scan("text.txt",what=character(),sep="\n",blank.lines.skip=T)   #use the b
 #remove the leading and trailing white spaces
 text1<-str_trim(text)
 
-#####code for extra credit########
+#####extra credit for problem1########
 #if some area codes are in parenthesis,
 #I can simply remove "\(""\)" from the text
 glob2rx()
@@ -90,5 +90,59 @@ colnames(phone_book)<-c("Type","Number")
 
 write.csv(phone_book,"PhoneBook.csv")
 
+########--------Q2-------#########
+
+#create sample text with expression "a+-b" where a can be any real number
+
+num<-round(runif(20,-10,10))
+ope<-sample(c("+","-"),10,replace=T)
+exp<-paste(num[1:10],ope,num[11:20],sep="")
+#add sums that involve fractional decimals
+fra<-runif(4,5,10)
+exp2<-paste(fra[1:2],sample(c("+","-"),2,replace=T),fra[3:4],sep="")
+exp<-c(exp,exp2)        #These 12 expressions are our sample.
+
+#store the sample expression in a txt file
+writeLines(exp,"Expression.txt",sep="\n")
+
+#two cases present in the sample: 
+#strings that start with a positive number and strings that start with a negtive number
+#I will deal with these two cases separately
+
+pos<-"^[[:digit:]]+"
+neg<-"^-[[:digit:]]+"
+
+#using str_detect, we devide the sample into subset
+#with exp1, the operator is first [+-]; with exp2,it is the second
+exppos<-exp[str_detect(exp,pos)]
+expneg<-exp[str_detect(exp,neg)]
+
+#split exppos into number operator number,and do the calculation
+result1<-sapply(exppos,function(x){
+  split<-as.numeric(str_locate(x,"[+-]")[1,1])
+  num1<-as.numeric(str_sub(x,1,split-1))
+  operator<-str_sub(x,split,split)
+  num2<-as.numeric(str_sub(x,split+1,nchar(x)))
+  if (operator=="+"){
+    num1+num2
+  }else{
+    num1-num2
+  }
+})
+names(result1)<-NULL
+
+#split expneg into number operator number,and do the calculation
+result2<-sapply(expneg,function(x){
+  split<-as.numeric(str_locate_all(x,"[+-]")[[1]][2,1])
+  num1<-as.numeric(str_sub(x,1,split-1))
+  operator<-str_sub(x,split,split)
+  num2<-as.numeric(str_sub(x,split+1,nchar(x)))
+  if (operator=="+"){
+    num1+num2
+  }else{
+    num1-num2
+  }
+})
+names(result2)<-NULL
 
 
