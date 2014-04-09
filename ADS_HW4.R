@@ -5,8 +5,15 @@
 rm(list=ls())
 setwd("C:/Users/Rongyao/SkyDrive (2)/2014Spring/Applied Data Science/HW/HW4")
 
-library(stringr)
-library(utils)
+if(!require("stringr")){
+  install.packages("stringr")
+  library(stringr)
+}
+if(!require("utils")){
+  install.packages("utils")
+  library(utils)
+}
+
 
 ########--------Q1-------#########
 
@@ -17,22 +24,28 @@ library(utils)
 text <- c(" 219 733 8965", "329-293-8753 ", "banana", "595 794 7569",
           "387 287 6718", "apple", "233.398.9187 ", "482 952 3315", "239 923 8115",
           "842 566 4692", "Work: 579-499-7527", "$1000", "Home: 543.355.3679")
-#write out as a .txt file and modify
-writeLines(text,con="text.txt",sep="\n",useBytes=T)    #useBytes will transform UTF to character
-#read the modified version in
-text<-scan("text.txt",what=character(),sep="\n",blank.lines.skip=T)   #use the blank.lines.skip, I get rid of the blanks lines in the file
+
+#modify the sample text to include more complicated cases
+text<-c(text,"work:\n378 897 3792","home:\n (589)-893-8926","\n","(783)-372-8922","(387).897.9038")
+
+#write out the text file
+writeLines(text,"text.txt",sep="\n",useBytes=T)
+#read it in, strip the blank lines
+text1<-scan(file="text.txt",what="character",blank.lines.skip=T,sep="\n")
 #remove the leading and trailing white spaces
-text1<-str_trim(text)
+text2<-str_trim(text1)
 
 #####extra credit for problem1########
 #if some area codes are in parenthesis,
-#I can simply remove "\(""\)" from the text
-glob2rx()
-str_replace_all()
+#I can simply remove "\\(" and ")" from the text
+glob2rx("(")
+glob2rx(")")
+text3<-str_replace_all(text2,"\\(","")
+text3<-str_replace_all(text3,")","")
 
 #as type and phone number may be separated in two lines
 #I first concatenate them together with a comma
-text2<-str_c(text1,collapse=",")
+text4<-str_c(text3,collapse=",")
 
 #then I try to deal separately with phone numbers that have type info attached and those without
 
@@ -41,11 +54,11 @@ text2<-str_c(text1,collapse=",")
 typephone<-"[[:alpha:]]+:[ ,]([2-9][0-9]{2})[- .]([0-9]{3})[- .]([0-9]{4})"
 
 #check if the regexpr used is effective
-str_extract_all(text2,typephone) 
+str_extract_all(text4,typephone) 
 
 #extract
-loc<-str_locate_all(text2,typephone)[[1]]
-phone_type<-str_sub(text2, loc[,"start"], loc[,"end"])
+loc<-str_locate_all(text4,typephone)[[1]]
+phone_type<-str_sub(text4, loc[,"start"], loc[,"end"])
 
 #substitute comma with a space
 phone_type2<-str_replace_all(phone_type, ",", " ")
@@ -64,12 +77,13 @@ phone_type5<-t(phone_type5)
 row.names(phone_type5)<-NULL
 phone_type5[,2]<-str_replace_all(phone_type5[,2],"^[[:blank:]]","")
 
+print(phone_type5)
 #########pick out the phone numbers with no type info#########
 
 phone<-",([2-9][0-9]{2})[- .]([0-9]{3})[- .]([0-9]{4}),"
 
 #check if the regexpr used is effective
-phone_notype<-str_extract_all(text2,phone)[[1]]
+phone_notype<-str_extract_all(text4,phone)[[1]]
 
 #remove all the comma
 phone_notype2<-str_replace_all(phone_notype, ",","")
@@ -84,11 +98,14 @@ phone_notype4<-rbind(rep("unclassified",length(phone_notype3)),phone_notype3)
 phone_notype4<-t(phone_notype4)
 row.names(phone_notype4)<-NULL
 
+print(phone_notype4)
 ###########Now we can join the all the phone number together#########
 phone_book<-rbind(phone_notype4,phone_type5)
 colnames(phone_book)<-c("Type","Number")
+print(phone_book)
 
 write.csv(phone_book,"PhoneBook.csv")
+
 
 ########--------Q2-------#########
 
@@ -105,21 +122,13 @@ exp<-c(exp,exp2)        #These 12 expressions are our sample.
 #store the sample expression in a txt file
 writeLines(exp,"Expression.txt",sep="\n")
 
-#two cases present in the sample: 
-#strings that start with a positive number and strings that start with a negtive number
-#I will deal with these two cases separately
+#split exp into number operator number,and do the calculation
 
-pos<-"^[[:digit:]]+"
-neg<-"^-[[:digit:]]+"
+#####extra credit for problem1########
 
-#using str_detect, we devide the sample into subset
-#with exp1, the operator is first [+-]; with exp2,it is the second
-exppos<-exp[str_detect(exp,pos)]
-expneg<-exp[str_detect(exp,neg)]
-
-#split exppos into number operator number,and do the calculation
-result1<-sapply(exppos,function(x){
-  split<-as.numeric(str_locate(x,"[+-]")[1,1])
+#this methods can deal with both interger and fractional decimals
+result<-sapply(exp,function(x){
+  split<-as.numeric(str_locate(x,"[[:digit:]][+-]")[1,2])
   num1<-as.numeric(str_sub(x,1,split-1))
   operator<-str_sub(x,split,split)
   num2<-as.numeric(str_sub(x,split+1,nchar(x)))
@@ -129,20 +138,8 @@ result1<-sapply(exppos,function(x){
     num1-num2
   }
 })
-names(result1)<-NULL
+names(result)<-NULL
 
-#split expneg into number operator number,and do the calculation
-result2<-sapply(expneg,function(x){
-  split<-as.numeric(str_locate_all(x,"[+-]")[[1]][2,1])
-  num1<-as.numeric(str_sub(x,1,split-1))
-  operator<-str_sub(x,split,split)
-  num2<-as.numeric(str_sub(x,split+1,nchar(x)))
-  if (operator=="+"){
-    num1+num2
-  }else{
-    num1-num2
-  }
-})
-names(result2)<-NULL
+print(result)
 
 
