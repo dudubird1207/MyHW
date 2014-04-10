@@ -17,111 +17,82 @@ if(!require("utils")){
 
 ########--------Q1-------#########
 
-#modify the sample text given in Rlog to include more complicated cases
-#e.g. blank lines, separate type and phone number by \n, uppercase and lowercase
+#read in the sample phone number file, strip the blank lines
+text1<-scan(file="problem1.txt",what="character",blank.lines.skip=T,sep="\n")
 
-#copy the sample text
-text <- c(" 219 733 8965", "329-293-8753 ", "banana", "595 794 7569",
-          "387 287 6718", "apple", "233.398.9187 ", "482 952 3315", "239 923 8115",
-          "842 566 4692", "Work: 579-499-7527", "$1000", "Home: 543.355.3679")
-
-#modify the sample text to include more complicated cases
-text<-c(text,"work:\n378 897 3792","home:\n (589)-893-8926","\n","(783)-372-8922","(387).897.9038")
-
-#write out the text file
-writeLines(text,"text.txt",sep="\n",useBytes=T)
-#read it in, strip the blank lines
-text1<-scan(file="text.txt",what="character",blank.lines.skip=T,sep="\n")
-#remove the leading and trailing white spaces
-text2<-str_trim(text1)
+#since one record may be separated into two lines, I first concatenate all lines together with sep=" "
+text2<-str_c(text1,collapse=" ")
 
 #####extra credit for problem1########
-#if some area codes are in parenthesis,
-#I can simply remove "\\(" and ")" from the text
+#some area codes are in parenthesis,I simply remove "\\(" and ")" from the text because area code is not of particular interest
 glob2rx("(")
 glob2rx(")")
 text3<-str_replace_all(text2,"\\(","")
 text3<-str_replace_all(text3,")","")
 
-#as type and phone number may be separated in two lines
-#I first concatenate them together with a comma
-text4<-str_c(text3,collapse=",")
+#two type of phone numbers present in the sample:1-xxx[- ]xxx-xxxx(4 parts) or xxx[- ]xxx-xxxx(3 parts)
+#in the original records,parts of one records can be separated into two lines;
+#after concatenation, there can be extra space either in front of or after the [- ] sign
 
-#then I try to deal separately with phone numbers that have type info attached and those without
+#also, I regard the letters before a phone number as its type info; if missing, then the number gets tagged "unclassified"
 
-#######pick out the phone numbers with type info#########
+#I first deal with type 1-xxx[- ]xxx-xxxx
+#with type info
 
-typephone<-"[[:alpha:]]+:[ ,]([2-9][0-9]{2})[- .]([0-9]{3})[- .]([0-9]{4})"
+phone1<-"[[:alpha:]]+:[ ]+1[ ]{0,1}-[ ]{0,1}([2-9][0-9]{2})[ ]{0,1}[- ][ ]{0,1}([0-9]{3})[ ]{0,1}[- ][ ]{0,1}([0-9]{4})"
+num1<-str_extract_all(text3,phone1)[[1]]
+#remove all the spaces
+num1<-str_replace_all(num1," ","")
+#extract type info
+require(plyr)
+book1<-ldply(str_split(num1,":"),function(x)data.frame(type=x[1],number=x[2]))
 
-#check if the regexpr used is effective
-str_extract_all(text4,typephone) 
+#without type info
 
-#extract
-loc<-str_locate_all(text4,typephone)[[1]]
-phone_type<-str_sub(text4, loc[,"start"], loc[,"end"])
+phone2<-"[0-9][ ]+1[ ]{0,1}-[ ]{0,1}([2-9][0-9]{2})[ ]{0,1}[- ][ ]{0,1}([0-9]{3})[ ]{0,1}[- ][ ]{0,1}([0-9]{4})"
+num2<-str_extract_all(text3,phone2)[[1]]
+num2<-str_replace_all(num2,"^[0-9]","")
+#remove all the spaces
+num2<-str_replace_all(num2," ","")
+#add type info
+book2<-data.frame(type=rep("unclassified",length(num2)),number=num2)
 
-#substitute comma with a space
-phone_type2<-str_replace_all(phone_type, ",", " ")
+#in quite the same light, I deal with type xxx[- ]xxx-xxxx
+#with type info
 
-#change all letters to lower case
-phone_type3<-tolower(phone_type2)
+phone3<-"[[:alpha:]]+:[ ]+([2-9][0-9]{2})[ ]{0,1}[- ][ ]{0,1}([0-9]{3})[ ]{0,1}[- ][ ]{0,1}([0-9]{4})"
+num3<-str_extract_all(text3,phone3)[[1]]   #there is no such record
 
-#reformat phone numbers
-phone_type4<-str_replace_all(phone_type3,"-"," ")
-phone_type4<-str_replace_all(phone_type4,"\\."," ")
+#without type info
+phone4<-"([2-9][0-9]{2})[ ]{0,1}[- ][ ]{0,1}([0-9]{3})[ ]{0,1}[- ][ ]{0,1}([0-9]{4})"
+num4<-str_extract_all(text3,phone4)[[1]]   
+#remove all the space and -
+num4<-str_replace_all(num4,"[ -]","")
+#reformat the number
+num4<-sapply(num4,function(x)paste(str_sub(x,1,3),"-",str_sub(x,4,6),"-",str_sub(x,7,10),collapse="",sep=""))
+#add type info
+book4<-data.frame(type=rep("unclassified",length(num4)),number=num4)
+row.names(book4)<-NULL
 
-#classify the phone numbers
-phone_type5<-as.data.frame(sapply(seq_along(phone_type4),function(i)unlist(strsplit(phone_type4[i],":"))))
+#now we are ready to paste everything together 
+phonebook<-rbind(book1,book2,book4)
 
-phone_type5<-t(phone_type5)
-row.names(phone_type5)<-NULL
-phone_type5[,2]<-str_replace_all(phone_type5[,2],"^[[:blank:]]","")
+write.csv(phonebook,"PhoneBook.csv")
 
-print(phone_type5)
-#########pick out the phone numbers with no type info#########
+#we can check each type of phone numbers
+table(phonebook$type)
 
-phone<-",([2-9][0-9]{2})[- .]([0-9]{3})[- .]([0-9]{4}),"
 
-#check if the regexpr used is effective
-phone_notype<-str_extract_all(text4,phone)[[1]]
 
-#remove all the comma
-phone_notype2<-str_replace_all(phone_notype, ",","")
-
-#reformat phone numbers
-phone_notype3<-str_replace_all(phone_notype2,"-"," ")
-phone_notype3<-str_replace_all(phone_notype3,"\\."," ")
-
-#add type "unknown"
-phone_notype4<-rbind(rep("unclassified",length(phone_notype3)),phone_notype3)
-
-phone_notype4<-t(phone_notype4)
-row.names(phone_notype4)<-NULL
-
-print(phone_notype4)
-###########Now we can join the all the phone number together#########
-phone_book<-rbind(phone_notype4,phone_type5)
-colnames(phone_book)<-c("Type","Number")
-print(phone_book)
-
-write.csv(phone_book,"PhoneBook.csv")
 
 
 ########--------Q2-------#########
 
-#create sample text with expression "a+-b" where a can be any real number
+#read in the sample expression file
+exp<-scan(file="problem2.txt",what="character",blank.lines.skip=T,sep=" ")
 
-num<-round(runif(20,-10,10))
-ope<-sample(c("+","-"),10,replace=T)
-exp<-paste(num[1:10],ope,num[11:20],sep="")
-#add sums that involve fractional decimals
-fra<-runif(4,5,10)
-exp2<-paste(fra[1:2],sample(c("+","-"),2,replace=T),fra[3:4],sep="")
-exp<-c(exp,exp2)        #These 12 expressions are our sample.
-
-#store the sample expression in a txt file
-writeLines(exp,"Expression.txt",sep="\n")
-
+#remove blank fields
+exp<-exp[!(exp=="")]
 #split exp into number operator number,and do the calculation
 
 #####extra credit for problem1########
